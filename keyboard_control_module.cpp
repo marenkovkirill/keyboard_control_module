@@ -2,6 +2,7 @@
 #include <string.h>
 #include <windows.h>
 #include <winuser.h>
+#include <map>
 
 #include "../module_headers/module.h"
 #include "../module_headers/control_module.h"
@@ -12,13 +13,6 @@
 #include "SimpleIni.h"
 
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
-
-std::map<std::string, regval> axis_names;
-std::map<WORD, AxisKey*> axis_keys;
-std::map<regval, AxisData*> axis;
-
-/* GLOBALS CONFIG */
-int COUNT_AXIS;
 
 inline regval getIniValue(CSimpleIniA *ini, const char *section_name, const char *key_name) {
 	const char *tmp = ini->GetValue(section_name, key_name, NULL);
@@ -50,34 +44,31 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 		goto exit; //error
 	}
 
-	bool working = true;
 	INPUT_RECORD irInBuf[128];
 	DWORD cNumRead;
 	DWORD i;
-	while (working) {
+	while (1) {
 		if (!ReadConsoleInput(hStdin, irInBuf, 128, &cNumRead))  {
-			return; //error
+			goto exit; //error
 		}
 
-		for (i = 0; i < cNumRead; i++) {
-			switch (irInBuf[i].EventType) {
-				case KEY_EVENT: {
-						WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
-						printf("Key event: %d", key_code);
-						if (key_code != VK_ESCAPE) {
-							if (axis_keys.find(key_code) != axis_keys.end()) {
-								AxisKey *ak = axis_keys[key_code];
-								regval axis_index = ak->axis_index;
-								regval val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
-								printf("axis %d val %d \n", axis_index, val);
-								(*sendAxisState)(axis_index, val);
-							}
-						} else {
-							working = false;
-						}
+		for (i = 0; i < cNumRead; ++i) {
+			if (irInBuf[i].EventType == KEY_EVENT) { 
+				WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
+				printf("Key event: %d", key_code);
+				
+				if (key_code != VK_ESCAPE) {
+					if (axis_keys.find(key_code) != axis_keys.end()) {
+						AxisKey *ak = axis_keys[key_code];
+						regval axis_index = ak->axis_index;
+						regval val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
+						
+						printf("axis %d val %d \n", axis_index, val);
+						(*sendAxisState)(axis_index, val);
 					}
-				default:
-					break;
+				} else {
+					goto exit; //exit
+				}
 			}
 		}
 	}
