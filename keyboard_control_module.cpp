@@ -145,12 +145,13 @@ KeyboardControlModule::KeyboardControlModule() {
 	axis_names.clear();
 
 	COUNT_AXIS = axis.size();
-	robot_axis = new AxisData[COUNT_AXIS];
+	robot_axis = new AxisData*[COUNT_AXIS];
 	for (int j = 0; j < COUNT_AXIS; ++j) {
-		robot_axis[j].axis_index = axis[j+1]->axis_index;
-		robot_axis[j].lower_value = axis[j+1]->lower_value;
-		robot_axis[j].upper_value = axis[j+1]->upper_value;
-		robot_axis[j].name = axis[j+1]->name;
+		robot_axis[j] = new AxisData;
+		robot_axis[j]->axis_index = axis[j+1]->axis_index;
+		robot_axis[j]->lower_value = axis[j+1]->lower_value;
+		robot_axis[j]->upper_value = axis[j+1]->upper_value;
+		robot_axis[j]->name = axis[j+1]->name;
 	}
 	
 	is_error_init = 0;
@@ -160,7 +161,7 @@ int KeyboardControlModule::init() {
 	return is_error_init ? 1 : 0;
 }
 
-AxisData* KeyboardControlModule::getAxis(int *count_axis) {
+AxisData** KeyboardControlModule::getAxis(int *count_axis) {
 	if (is_error_init) {
 		(*count_axis) = 0;
 		return NULL;
@@ -171,6 +172,9 @@ AxisData* KeyboardControlModule::getAxis(int *count_axis) {
 }
 
 void KeyboardControlModule::destroy() {
+	for (int j = 0; j < COUNT_AXIS; ++j) {
+		delete robot_axis[j];
+	}
 	delete[] robot_axis;
 	
 	for(
@@ -196,7 +200,5 @@ void KeyboardControlModule::destroy() {
 }
 
 __declspec(dllexport) ControlModule* getControlModuleObject() {
-	KeyboardControlModule *kcm = new KeyboardControlModule();
-	ControlModule *cm = kcm;
-	return cm;
+	return new KeyboardControlModule();
 }
