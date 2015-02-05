@@ -157,6 +157,10 @@ KeyboardControlModule::KeyboardControlModule() {
 	is_error_init = 0;
 }
 
+int KeyboardControlModule::getVersion() {
+	return 0x0100; //1.00
+}
+
 int KeyboardControlModule::init() {
 	return is_error_init ? 1 : 0;
 }
