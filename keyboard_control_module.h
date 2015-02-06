@@ -19,12 +19,13 @@ class KeyboardControlModule : public ControlModule {
 
 	public:
 		KeyboardControlModule();
-		virtual int init();
-		virtual AxisData** getAxis(int *count_axis);
-		virtual void execute(sendAxisState_t sendAxisState);
-		virtual void final() {};
-		virtual void destroy();
-		virtual ~KeyboardControlModule() {}
+		const char *getUID();
+		int init();
+		AxisData** getAxis(int *count_axis);
+		void execute(sendAxisState_t sendAxisState);
+		void final() {};
+		void destroy();
+		~KeyboardControlModule() {}
 };
 
 #endif	/* KEYBOARD_CONTROL_MODULE_H */

@@ -157,6 +157,10 @@ KeyboardControlModule::KeyboardControlModule() {
 	is_error_init = 0;
 }
 
+const char *KeyboardControlModule::getUID() {
+	return "Keyboard control module 1.00";
+}
+
 int KeyboardControlModule::init() {
 	return is_error_init ? 1 : 0;
 }
