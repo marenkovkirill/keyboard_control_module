@@ -157,8 +157,8 @@ KeyboardControlModule::KeyboardControlModule() {
 	is_error_init = 0;
 }
 
-int KeyboardControlModule::getVersion() {
-	return 0x0100; //1.00
+const char *KeyboardControlModule::getUID() {
+	return "Keyboard control module 1.00";
 }
 
 int KeyboardControlModule::init() {

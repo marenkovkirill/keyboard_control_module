@@ -19,7 +19,7 @@ class KeyboardControlModule : public ControlModule {
 
 	public:
 		KeyboardControlModule();
-		int getVersion();
+		const char *getUID();
 		int init();
 		AxisData** getAxis(int *count_axis);
 		void execute(sendAxisState_t sendAxisState);
