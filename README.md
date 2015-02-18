@@ -1,5 +1,5 @@
 # keyboard_control_module
-keyboard_control_module
+
 # Модуль управления роботом для клавиатуры
 -----------------------------
 
