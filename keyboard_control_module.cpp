@@ -91,7 +91,12 @@ KeyboardControlModule::KeyboardControlModule() {
 
 	CSimpleIniA ini;
     ini.SetMultiKey(true);
-    ini.LoadFile(ConfigPath);
+
+	if (ini.LoadFile(ConfigPath) < 0) {
+		printf("Can't load '%s' file!\n", ConfigPath);
+		is_error_init = true;
+		return;
+	}
 
 	CSimpleIniA::TNamesDepend axis_names_ini;
 	ini.GetAllKeys("mapped_axis", axis_names_ini);
@@ -138,7 +143,7 @@ KeyboardControlModule::KeyboardControlModule() {
 			++axis_id;
 		}
 	} catch (...) {
-		is_error_init = 1;
+		is_error_init = true;
 		return;
 	}
 	axis_names_ini.clear();
@@ -154,7 +159,7 @@ KeyboardControlModule::KeyboardControlModule() {
 		robot_axis[j]->name = axis[j+1]->name;
 	}
 	
-	is_error_init = 0;
+	is_error_init = false;
 }
 
 const char *KeyboardControlModule::getUID() {
