@@ -10,6 +10,7 @@ struct AxisKey {
 class KeyboardControlModule : public ControlModule {
 	AxisData **robot_axis;
 	int COUNT_AXIS;
+	colorPrintf_t *colorPrintf;
 	
 	bool is_error_init;
 	
@@ -20,6 +21,7 @@ class KeyboardControlModule : public ControlModule {
 	public:
 		KeyboardControlModule();
 		const char *getUID();
+		void prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p);
 		int init();
 		AxisData** getAxis(int *count_axis);
 		void execute(sendAxisState_t sendAxisState);

@@ -55,7 +55,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 		for (i = 0; i < cNumRead; ++i) {
 			if (irInBuf[i].EventType == KEY_EVENT) { 
 				WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
-				printf("Key event: %d", key_code);
+				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
 				
 				if (key_code != VK_ESCAPE) {
 					if (axis_keys.find(key_code) != axis_keys.end()) {
@@ -63,7 +63,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 						regval axis_index = ak->axis_index;
 						regval val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
 						
-						printf("axis %d val %d \n", axis_index, val);
+						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %d \n", axis_index, val);
 						(*sendAxisState)(axis_index, val);
 					}
 				} else {
@@ -164,6 +164,10 @@ KeyboardControlModule::KeyboardControlModule() {
 
 const char *KeyboardControlModule::getUID() {
 	return "Keyboard control module 1.00";
+}
+
+void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
+	this->colorPrintf = colorPrintf_p;
 }
 
 int KeyboardControlModule::init() {
