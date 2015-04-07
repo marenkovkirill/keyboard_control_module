@@ -14,13 +14,13 @@
 
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 
-inline regval getIniValue(CSimpleIniA *ini, const char *section_name, const char *key_name) {
+inline variable_value getIniValue(CSimpleIniA *ini, const char *section_name, const char *key_name) {
 	const char *tmp = ini->GetValue(section_name, key_name, NULL);
 	if (!tmp) {
 		printf("Not specified value for \"%s\" in section \"%s\"!\n", key_name, section_name);
 		throw;
 	}
-	return strtol(tmp, NULL, 0);
+	return strtod(tmp, NULL);
 }
 
 inline const char *copyStrValue(const char *source) {
@@ -55,15 +55,15 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 		for (i = 0; i < cNumRead; ++i) {
 			if (irInBuf[i].EventType == KEY_EVENT) { 
 				WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
-				printf("Key event: %d", key_code);
+				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
 				
 				if (key_code != VK_ESCAPE) {
 					if (axis_keys.find(key_code) != axis_keys.end()) {
 						AxisKey *ak = axis_keys[key_code];
-						regval axis_index = ak->axis_index;
-						regval val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
+						system_value axis_index = ak->axis_index;
+						variable_value val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
 						
-						printf("axis %d val %d \n", axis_index, val);
+						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
 						(*sendAxisState)(axis_index, val);
 					}
 				} else {
@@ -101,7 +101,7 @@ KeyboardControlModule::KeyboardControlModule() {
 	CSimpleIniA::TNamesDepend axis_names_ini;
 	ini.GetAllKeys("mapped_axis", axis_names_ini);
 	
-	regval axis_id = 1;
+	system_value axis_id = 1;
 	try {
 		for (
 			CSimpleIniA::TNamesDepend::const_iterator i = axis_names_ini.begin(); 
@@ -151,7 +151,7 @@ KeyboardControlModule::KeyboardControlModule() {
 
 	COUNT_AXIS = axis.size();
 	robot_axis = new AxisData*[COUNT_AXIS];
-	for (int j = 0; j < COUNT_AXIS; ++j) {
+	for (unsigned int j = 0; j < COUNT_AXIS; ++j) {
 		robot_axis[j] = new AxisData;
 		robot_axis[j]->axis_index = axis[j+1]->axis_index;
 		robot_axis[j]->lower_value = axis[j+1]->lower_value;
@@ -163,14 +163,18 @@ KeyboardControlModule::KeyboardControlModule() {
 }
 
 const char *KeyboardControlModule::getUID() {
-	return "Keyboard control module 1.00";
+	return "Keyboard control module 1.01";
+}
+
+void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
+	this->colorPrintf = colorPrintf_p;
 }
 
 int KeyboardControlModule::init() {
 	return is_error_init ? 1 : 0;
 }
 
-AxisData** KeyboardControlModule::getAxis(int *count_axis) {
+AxisData** KeyboardControlModule::getAxis(unsigned int *count_axis) {
 	if (is_error_init) {
 		(*count_axis) = 0;
 		return NULL;
@@ -181,13 +185,13 @@ AxisData** KeyboardControlModule::getAxis(int *count_axis) {
 }
 
 void KeyboardControlModule::destroy() {
-	for (int j = 0; j < COUNT_AXIS; ++j) {
+	for (unsigned int j = 0; j < COUNT_AXIS; ++j) {
 		delete robot_axis[j];
 	}
 	delete[] robot_axis;
 	
 	for(
-		std::map<WORD, AxisKey*>::iterator i = axis_keys.begin();
+		auto i = axis_keys.begin();
 		i != axis_keys.end();
 		++i
 		) {
@@ -196,7 +200,7 @@ void KeyboardControlModule::destroy() {
 	axis_keys.clear();
 	
 	for(
-		std::map<regval, AxisData*>::iterator i = axis.begin();
+		auto i = axis.begin();
 		i != axis.end();
 		++i
 		) {
