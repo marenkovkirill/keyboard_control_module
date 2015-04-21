@@ -20,12 +20,25 @@ class KeyboardControlModule : public ControlModule {
 
 	public:
 		KeyboardControlModule();
+
+		//init
 		const char *getUID();
 		void prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p);
-		int init();
+	
+		//compiler only
 		AxisData** getAxis(unsigned int *count_axis);
+		void *writePC(unsigned int *buffer_length);
+
+		//intepreter - devices
+		int init();
 		void execute(sendAxisState_t sendAxisState);
 		void final() {};
+
+		//intepreter - program
+		int startProgram(int uniq_index, void *buffer, unsigned int buffer_length);
+		int endProgram(int uniq_index);
+
+		//destructor
 		void destroy();
 		~KeyboardControlModule() {}
 };
