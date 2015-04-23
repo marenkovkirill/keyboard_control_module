@@ -212,6 +212,20 @@ void KeyboardControlModule::destroy() {
 	delete this;
 }
 
+void *KeyboardControlModule::writePC(unsigned int *buffer_length) {
+	*buffer_length = 0;
+	return NULL;
+}
+
+int KeyboardControlModule::startProgram(int uniq_index, void *buffer, unsigned int buffer_length) {
+	return 0;
+}
+
+int KeyboardControlModule::endProgram(int uniq_index) {
+	return 0;
+}
+
+
 __declspec(dllexport) ControlModule* getControlModuleObject() {
 	return new KeyboardControlModule();
 }
