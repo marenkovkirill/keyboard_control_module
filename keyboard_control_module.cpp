@@ -1,18 +1,33 @@
 #include <stdio.h>
 #include <string.h>
-#include <windows.h>
-#include <winuser.h>
+
+#ifdef _WIN32
+	#include <windows.h>
+	#include <winuser.h>
+#else
+	//#include <cstdarg> //va_list
+	#include <wchar.h>
+	#include <stdint.h>
+	#include <stdlib.h>
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <errno.h>
+	#include <linux/input.h>
+	#include <limits.h>
+#endif	
+
 #include <map>
 
-#include "../module_headers/module.h"
-#include "../module_headers/control_module.h"
-#include "../rcml_compiler/globals.h"
+#include "module.h"
+#include "control_module.h"
 
 #include "keyboard_control_module.h"
 
 #include "SimpleIni.h"
 
-EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+#ifdef _WIN32
+	EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+#endif
 
 inline variable_value getIniValue(CSimpleIniA *ini, const char *section_name, const char *key_name) {
 	const char *tmp = ini->GetValue(section_name, key_name, NULL);
@@ -30,6 +45,7 @@ inline const char *copyStrValue(const char *source) {
 }
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
+#ifdef _WIN32
 	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	if (hStdin == INVALID_HANDLE_VALUE) {
 		goto exit; //error
@@ -39,6 +55,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 	if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) {
 		goto exit; //error
 	}
+
 	DWORD fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
 	if (!SetConsoleMode(hStdin, fdwMode)) {
 		goto exit; //error
@@ -75,9 +92,67 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 
 	exit:
 	SetConsoleMode(hStdin, fdwSaveOldMode);
+#else
+	const char *dev = InputDevice.c_str();//"/dev/input/event2";//"/dev/input/by-path/platform-i8042-serio-0-event-kbd";
+    struct input_event ev;
+    ssize_t n;
+    int fd;
+
+    fd = open(dev, O_RDONLY);
+    if (fd == -1) {
+        //fprintf(stderr, "Cannot open %s: %s.\n", dev, strerror(errno));
+        (*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Cannot open %s: %s.\n", dev, strerror(errno));
+    }
+
+	while (1) {
+
+		// Читаем вводимую инфу
+		n = read(fd, &ev, sizeof ev);
+        if (n == (ssize_t)-1) {
+            if (errno == EINTR)
+                continue;
+            else
+                goto exit;
+        } else
+        if (n != sizeof ev) {
+            errno = EIO;
+            goto exit;
+        }
+		// проверяем сколько символов считали видимо
+			// Типа если нажали нужную кнопку то смотрим что нажали
+			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
+				uint16_t key_code = ev.code;
+				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
+				// Записали что нажали и вывели на экран
+
+				if (key_code != KEY_ESC) {
+					//если не выходим, то проверяем что вообще нажали
+					if (axis_keys.find(key_code) != axis_keys.end()) {
+						// Ищем и если нашли, то работаем
+						AxisKey *ak = axis_keys[key_code]; // находим ось соответствующую нажатой кнопке
+						system_value axis_index = ak->axis_index;
+						// Должно работать ev.value 0 - клавиша отпущена, 1 - нажата, 2 - автоповтор(все еще нажата)
+						variable_value val = ev.value ? ak->pressed_value : ak->unpressed_value;
+						// Узнаем нажата или отпущена клавиша
+						// Тут надо более громоздкую штуку чтоб понятно было, хотя может и нет
+
+						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
+						(*sendAxisState)(axis_index, val);
+					}
+				} else {
+					goto exit; //exit
+				}
+			}
+	}
+
+	exit:
+	close(fd);
+#endif
 }
 
 KeyboardControlModule::KeyboardControlModule() {
+
+#ifdef _WIN32
 	WCHAR DllPath[MAX_PATH] = {0};
 	GetModuleFileNameW((HINSTANCE)&__ImageBase, DllPath, _countof(DllPath));
 
@@ -87,8 +162,26 @@ KeyboardControlModule::KeyboardControlModule() {
 	size_t path_len = tmp - DllPath;
 
 	wcsncpy(ConfigPath, DllPath, path_len);
-	wcscat(ConfigPath, L"\\config.ini");
+	wcscat(ConfigPath, L"\\config.ini"); 
 
+#else
+	std::string ProcPath("/proc/");
+	ProcPath += std::to_string(getpid()); 
+	ProcPath += "/exe"; // Собираем путь до процесса
+
+	char SOPath[PATH_MAX] = {};
+	readlink(ProcPath.c_str(), SOPath, PATH_MAX);
+
+	std::string temp(SOPath);
+	int found = temp.find_last_of("/");
+
+	temp = temp.substr(0,found);
+	temp += "/config.ini";
+
+	const char* ConfigPath = temp.c_str();
+
+#endif
+	
 	CSimpleIniA ini;
     ini.SetMultiKey(true);
 
@@ -97,6 +190,12 @@ KeyboardControlModule::KeyboardControlModule() {
 		is_error_init = true;
 		return;
 	}
+
+	#ifdef _WIN32
+	#else
+		InputDevice = ini.GetValue("linux_input","input_path",NULL);
+	#endif
+
 
 	CSimpleIniA::TNamesDepend axis_names_ini;
 	ini.GetAllKeys("mapped_axis", axis_names_ini);
@@ -125,7 +224,12 @@ KeyboardControlModule::KeyboardControlModule() {
 				CSimpleIniA::TNamesDepend::const_iterator iniValue = values.begin(); 
 				iniValue != values.end(); 
 				++iniValue) { 
+
+				#ifdef _WIN32
 					WORD key_code = strtol(iniValue->pItem, NULL, 0);
+				#else
+					uint32_t key_code = strtol(iniValue->pItem, NULL, 0);
+				#endif
 
 					std::string key_name = section_name;
 					key_name.append("_");
@@ -226,6 +330,6 @@ int KeyboardControlModule::endProgram(int uniq_index) {
 }
 
 
-__declspec(dllexport) ControlModule* getControlModuleObject() {
+PREFIX_FUNC_DLL  ControlModule* getControlModuleObject() {
 	return new KeyboardControlModule();
 }
