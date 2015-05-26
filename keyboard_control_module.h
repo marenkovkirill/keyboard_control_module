@@ -15,7 +15,13 @@ class KeyboardControlModule : public ControlModule {
 	bool is_error_init;
 	
 	std::map<std::string, system_value> axis_names;
+#ifdef _WIN32
 	std::map<WORD, AxisKey*> axis_keys;
+#else
+	std::map<uint32_t, AxisKey*> axis_keys;
+	std::string InputDevice;
+#endif
+	
 	std::map<system_value, AxisData*> axis;
 
 	public:
