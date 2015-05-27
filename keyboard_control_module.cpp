@@ -138,6 +138,15 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 
 KeyboardControlModule::KeyboardControlModule() {
 
+}
+
+const char *KeyboardControlModule::getUID() {
+	return "Keyboard control module 1.01";
+}
+
+void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
+	this->colorPrintf = colorPrintf_p;
+
 #ifdef _WIN32
 	WCHAR DllPath[MAX_PATH] = {0};
 	GetModuleFileNameW((HINSTANCE)&__ImageBase, DllPath, _countof(DllPath));
@@ -170,7 +179,7 @@ KeyboardControlModule::KeyboardControlModule() {
     ini.SetMultiKey(true);
 
 	if (ini.LoadFile(ConfigPath) < 0) {
-		printf("Can't load '%s' file!\n", ConfigPath);
+		(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't load '%s' file!\n", ConfigPath);
 		is_error_init = true;
 		return;
 	}
@@ -179,7 +188,7 @@ KeyboardControlModule::KeyboardControlModule() {
 		const char* tempInput;
 		tempInput = ini.GetValue("options","input_path",NULL);
 		if (tempInput == NULL) {
-			printf("Can't recieve path to input device");
+			(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't recieve path to input device");
 			is_error_init = true;
 			return;
 		}
@@ -256,14 +265,6 @@ KeyboardControlModule::KeyboardControlModule() {
 	}
 	
 	is_error_init = false;
-}
-
-const char *KeyboardControlModule::getUID() {
-	return "Keyboard control module 1.01";
-}
-
-void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
-	this->colorPrintf = colorPrintf_p;
 }
 
 int KeyboardControlModule::init() {
