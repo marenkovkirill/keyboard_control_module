@@ -99,45 +99,42 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
     }
 
 	while (1) {
-
 		n = read(fd, &ev, sizeof ev);
         if (n == (ssize_t)-1) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue;
-            else
+            }
+            else{
                 goto exit;
+            }
         } else
         if (n != sizeof ev) {
             errno = EIO;
             goto exit;
         }
-			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
-				uint16_t key_code = ev.code;
-				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
+		if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
+			uint16_t key_code = ev.code;
+			(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
 
-				if (key_code != KEY_ESC) {
-					if (axis_keys.find(key_code) != axis_keys.end()) {
+			if (key_code != KEY_ESC) {
+				if (axis_keys.find(key_code) != axis_keys.end()) {
 
-						AxisKey *ak = axis_keys[key_code]; 
-						system_value axis_index = ak->axis_index;
-						variable_value val = ev.value ? ak->pressed_value : ak->unpressed_value;
+					AxisKey *ak = axis_keys[key_code]; 
+					system_value axis_index = ak->axis_index;
+					variable_value val = ev.value ? ak->pressed_value : ak->unpressed_value;
 
-						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
-						(*sendAxisState)(axis_index, val);
-					}
-				} else {
-					goto exit; //exit
+					(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
+					(*sendAxisState)(axis_index, val);
 				}
+			} else {
+				goto exit; //exit
 			}
+		}
 	}
 
 	exit:
 	close(fd);
 #endif
-}
-
-KeyboardControlModule::KeyboardControlModule() {
-
 }
 
 const char *KeyboardControlModule::getUID() {

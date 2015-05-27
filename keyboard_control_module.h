@@ -25,7 +25,7 @@ class KeyboardControlModule : public ControlModule {
 	std::map<system_value, AxisData*> axis;
 
 	public:
-		KeyboardControlModule();
+		KeyboardControlModule(){};
 
 		//init
 		const char *getUID();
