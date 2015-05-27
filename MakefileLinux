@@ -12,7 +12,6 @@ INCLUDE_DIR_FLAGS = -I${MODULE_HEADERS_DIR} -I${SIMPLEINI_DIR}
 
 FLAGS_MUTUAL = -Wall -m32 -std=c++11 ${INCLUDE_DIR_FLAGS} -MMD -MP -MF "${OBJECTDIR}/$@.d"
 
-
 .PHONY: debug
 
 debug: OBJECTDIR = build/Debug
@@ -41,6 +40,6 @@ keyboard_control_module.o:  keyboard_control_module.cpp
 module: keyboard_control_module.o
 	@echo "-------------------------" 
 	mkdir -p ${OBJECTDIR}
-	${LINK.cc} -shared -o ${OBJECTDIR}/keyboard_module_$(FILENAME_FIX).so ${OBJECTDIR}/keyboard_control_module.o
+	${LINK.cc} -m32 -shared -o ${OBJECTDIR}/keyboard_module_$(FILENAME_FIX).so ${OBJECTDIR}/keyboard_control_module.o
 
 

@@ -1,29 +1,25 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <map>
 
 #ifdef _WIN32
 	#include <windows.h>
 	#include <winuser.h>
 #else
-	//#include <cstdarg> //va_list
-	#include <wchar.h>
-	#include <stdint.h>
-	#include <stdlib.h>
 	#include <unistd.h>
 	#include <fcntl.h>
+	#include <dlfcn.h> 
 	#include <errno.h>
 	#include <linux/input.h>
-	#include <limits.h>
 #endif	
 
-#include <map>
+#include "SimpleIni.h"
 
 #include "module.h"
 #include "control_module.h"
 
 #include "keyboard_control_module.h"
-
-#include "SimpleIni.h"
 
 #ifdef _WIN32
 	EXTERN_C IMAGE_DOS_HEADER __ImageBase;
@@ -93,56 +89,47 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 	exit:
 	SetConsoleMode(hStdin, fdwSaveOldMode);
 #else
-	const char *dev = InputDevice.c_str();//"/dev/input/event2";//"/dev/input/by-path/platform-i8042-serio-0-event-kbd";
     struct input_event ev;
     ssize_t n;
     int fd;
 
-    fd = open(dev, O_RDONLY);
+    fd = open(InputDevice.c_str(), O_RDONLY);
     if (fd == -1) {
-        //fprintf(stderr, "Cannot open %s: %s.\n", dev, strerror(errno));
-        (*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Cannot open %s: %s.\n", dev, strerror(errno));
+        (*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
     }
 
 	while (1) {
-
-		// Читаем вводимую инфу
 		n = read(fd, &ev, sizeof ev);
         if (n == (ssize_t)-1) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
                 continue;
-            else
+            }
+            else{
                 goto exit;
+            }
         } else
         if (n != sizeof ev) {
             errno = EIO;
             goto exit;
         }
-		// проверяем сколько символов считали видимо
-			// Типа если нажали нужную кнопку то смотрим что нажали
-			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
-				uint16_t key_code = ev.code;
-				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
-				// Записали что нажали и вывели на экран
+		if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
+			uint16_t key_code = ev.code;
+			(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
 
-				if (key_code != KEY_ESC) {
-					//если не выходим, то проверяем что вообще нажали
-					if (axis_keys.find(key_code) != axis_keys.end()) {
-						// Ищем и если нашли, то работаем
-						AxisKey *ak = axis_keys[key_code]; // находим ось соответствующую нажатой кнопке
-						system_value axis_index = ak->axis_index;
-						// Должно работать ev.value 0 - клавиша отпущена, 1 - нажата, 2 - автоповтор(все еще нажата)
-						variable_value val = ev.value ? ak->pressed_value : ak->unpressed_value;
-						// Узнаем нажата или отпущена клавиша
-						// Тут надо более громоздкую штуку чтоб понятно было, хотя может и нет
+			if (key_code != KEY_ESC) {
+				if (axis_keys.find(key_code) != axis_keys.end()) {
 
-						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
-						(*sendAxisState)(axis_index, val);
-					}
-				} else {
-					goto exit; //exit
+					AxisKey *ak = axis_keys[key_code]; 
+					system_value axis_index = ak->axis_index;
+					variable_value val = ev.value ? ak->pressed_value : ak->unpressed_value;
+
+					(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
+					(*sendAxisState)(axis_index, val);
 				}
+			} else {
+				goto exit; //exit
 			}
+		}
 	}
 
 	exit:
@@ -150,7 +137,12 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 #endif
 }
 
-KeyboardControlModule::KeyboardControlModule() {
+const char *KeyboardControlModule::getUID() {
+	return "Keyboard control module 1.01";
+}
+
+void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
+	this->colorPrintf = colorPrintf_p;
 
 #ifdef _WIN32
 	WCHAR DllPath[MAX_PATH] = {0};
@@ -165,20 +157,18 @@ KeyboardControlModule::KeyboardControlModule() {
 	wcscat(ConfigPath, L"\\config.ini"); 
 
 #else
-	std::string ProcPath("/proc/");
-	ProcPath += std::to_string(getpid()); 
-	ProcPath += "/exe"; // Собираем путь до процесса
 
-	char SOPath[PATH_MAX] = {};
-	readlink(ProcPath.c_str(), SOPath, PATH_MAX);
+	Dl_info PathToSharedObject;
+	void * pointer = reinterpret_cast<void*> (getControlModuleObject) ;
+	dladdr(pointer,&PathToSharedObject);
+	std::string dltemp(PathToSharedObject.dli_fname);
 
-	std::string temp(SOPath);
-	int found = temp.find_last_of("/");
+	int dlfound = dltemp.find_last_of("/");
 
-	temp = temp.substr(0,found);
-	temp += "/config.ini";
+	dltemp = dltemp.substr(0,dlfound);
+	dltemp += "/config.ini";
 
-	const char* ConfigPath = temp.c_str();
+	const char* ConfigPath = dltemp.c_str();
 
 #endif
 	
@@ -186,14 +176,22 @@ KeyboardControlModule::KeyboardControlModule() {
     ini.SetMultiKey(true);
 
 	if (ini.LoadFile(ConfigPath) < 0) {
-		printf("Can't load '%s' file!\n", ConfigPath);
+		(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't load '%s' file!\n", ConfigPath);
 		is_error_init = true;
 		return;
 	}
 
-	#ifdef _WIN32
-	#else
-		InputDevice = ini.GetValue("linux_input","input_path",NULL);
+	#ifndef _WIN32
+		const char* tempInput;
+		tempInput = ini.GetValue("options","input_path",NULL);
+		if (tempInput == NULL) {
+			(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't recieve path to input device");
+			is_error_init = true;
+			return;
+		}
+		InputDevice.assign(tempInput);
+
+
 	#endif
 
 
@@ -264,14 +262,6 @@ KeyboardControlModule::KeyboardControlModule() {
 	}
 	
 	is_error_init = false;
-}
-
-const char *KeyboardControlModule::getUID() {
-	return "Keyboard control module 1.01";
-}
-
-void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
-	this->colorPrintf = colorPrintf_p;
 }
 
 int KeyboardControlModule::init() {
