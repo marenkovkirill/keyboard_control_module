@@ -41,101 +41,107 @@ inline const char *copyStrValue(const char *source) {
 }
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
-#ifdef _WIN32
+	int fd;
 	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
-	if (hStdin == INVALID_HANDLE_VALUE) {
-		goto exit; //error
-	}
-
 	DWORD fdwSaveOldMode;
-	if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) {
-		goto exit; //error
-	}
-
-	DWORD fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
-	if (!SetConsoleMode(hStdin, fdwMode)) {
-		goto exit; //error
-	}
-
-	INPUT_RECORD irInBuf[128];
-	DWORD cNumRead;
-	DWORD i;
-	while (1) {
-		if (!ReadConsoleInput(hStdin, irInBuf, 128, &cNumRead))  {
-			goto exit; //error
+	try {
+#ifdef _WIN32
+		if (hStdin == INVALID_HANDLE_VALUE) {
+			throw std::exception();
 		}
 
-		for (i = 0; i < cNumRead; ++i) {
-			if (irInBuf[i].EventType == KEY_EVENT) { 
-				WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
+		if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) {
+			throw std::exception(); //error
+		}
+
+		DWORD fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+		if (!SetConsoleMode(hStdin, fdwMode)) {
+			throw std::exception(); //error
+		}
+
+		INPUT_RECORD irInBuf[128];
+		DWORD cNumRead;
+		DWORD i;
+		while (1) {
+			if (!ReadConsoleInput(hStdin, irInBuf, 128, &cNumRead))  {
+				throw std::exception(); //error
+			}
+
+			for (i = 0; i < cNumRead; ++i) {
+				if (irInBuf[i].EventType == KEY_EVENT) {
+					WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
+					(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
+					bool is_key_pressed = (bool) irInBuf[i].Event.KeyEvent.bKeyDown;
+
+					if (key_code != VK_ESCAPE) {
+#else
+		struct input_event ev;
+		ssize_t n;
+
+		fd = open(InputDevice.c_str(), O_RDONLY);
+		if (fd == -1) {
+			(*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
+			throw std::exception();
+		}
+
+		while (1) {
+			n = read(fd, &ev, sizeof ev);
+			if (n == (ssize_t)-1) {
+				if (errno == EINTR) {
+					continue;
+				}
+				else{
+					throw std::exception();
+				}
+			} else
+				if (n != sizeof ev) {
+					errno = EIO;
+					throw std::exception();
+				}
+			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
+				uint16_t key_code = ev.code;
 				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
-				
-				if (key_code != VK_ESCAPE) {
+
+				bool is_key_pressed = (bool) ev.value;
+
+				if (key_code != KEY_ESC) {
+#endif
 					if (axis_keys.find(key_code) != axis_keys.end()) {
-						AxisKey *ak = axis_keys[key_code];
+
+						AxisKey *ak = axis_keys[key_code]; 
 						system_value axis_index = ak->axis_index;
-						variable_value val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
 						
+						variable_value val = is_key_pressed ? ak->pressed_value : ak->unpressed_value;
+
 						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
 						(*sendAxisState)(axis_index, val);
+						}
 					}
-				} else {
-					goto exit; //exit
+				else {
+					if (is_key_pressed){
+						throw std::exception(); //exit
+					}
+				}
 				}
 			}
 		}
 	}
+catch(...) {
 
-	exit:
-	SetConsoleMode(hStdin, fdwSaveOldMode);
-#else
-    struct input_event ev;
-    ssize_t n;
-    int fd;
-
-    fd = open(InputDevice.c_str(), O_RDONLY);
-    if (fd == -1) {
-        (*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
-    }
-
-	while (1) {
-		n = read(fd, &ev, sizeof ev);
-        if (n == (ssize_t)-1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            else{
-                goto exit;
-            }
-        } else
-        if (n != sizeof ev) {
-            errno = EIO;
-            goto exit;
-        }
-		if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
-			uint16_t key_code = ev.code;
-			(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
-
-			if (key_code != KEY_ESC) {
-				if (axis_keys.find(key_code) != axis_keys.end()) {
-
-					AxisKey *ak = axis_keys[key_code]; 
-					system_value axis_index = ak->axis_index;
-					variable_value val = ev.value ? ak->pressed_value : ak->unpressed_value;
-
-					(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
-					(*sendAxisState)(axis_index, val);
-				}
-			} else {
-				goto exit; //exit
-			}
-		}
-	}
-
-	exit:
-	close(fd);
-#endif
 }
+#ifdef _WIN32
+SetConsoleMode(hStdin, fdwSaveOldMode);
+#else
+close(fd);
+#endif
+
+}
+
+
+
+
+
+
 
 const char *KeyboardControlModule::getUID() {
 	return "Keyboard control module 1.01";
