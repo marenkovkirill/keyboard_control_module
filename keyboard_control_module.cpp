@@ -44,9 +44,13 @@ inline const char *copyStrValue(const char *source) {
 }
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
-	int fd;
+#ifdef _WIN32
 	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	DWORD fdwSaveOldMode;
+#else
+	int fd;
+#endif
+	
 	try {
 #ifdef _WIN32
 		if (hStdin == INVALID_HANDLE_VALUE) {
