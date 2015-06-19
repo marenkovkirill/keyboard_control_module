@@ -8,10 +8,7 @@
 #include <map>
 
 #ifdef _WIN32
-	#include <wchar.h>
 	#include <windows.h>
-	#include <winuser.h>
-	#include <mbstring.h>
 #else
 	#include <unistd.h>
 	#include <fcntl.h>
