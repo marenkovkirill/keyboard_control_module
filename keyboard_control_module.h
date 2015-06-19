@@ -40,8 +40,11 @@ class KeyboardControlModule : public ControlModule {
 		void execute(sendAxisState_t sendAxisState);
 		void final() {};
 
-		//intepreter - program
-		int startProgram(int uniq_index, void *buffer, unsigned int buffer_length);
+		//intepreter - program & lib
+        void readPC(void *buffer, unsigned int buffer_length);
+        
+        //intepreter - program
+        int startProgram(int uniq_index);
 		int endProgram(int uniq_index);
 
 		//destructor

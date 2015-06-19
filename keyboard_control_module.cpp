@@ -1,15 +1,21 @@
+#ifdef _WIN32
+	#define _CRT_SECURE_NO_WARNINGS
+#endif	
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <string>
 #include <map>
 
 #ifdef _WIN32
+	#include <wchar.h>
 	#include <windows.h>
 	#include <winuser.h>
+	#include <mbstring.h>
 #else
 	#include <unistd.h>
 	#include <fcntl.h>
-	#include <dlfcn.h> 
+	#include <dlfcn.h>
 	#include <errno.h>
 	#include <linux/input.h>
 #endif	
@@ -137,12 +143,6 @@ close(fd);
 
 }
 
-
-
-
-
-
-
 const char *KeyboardControlModule::getUID() {
 	return "Keyboard control module 1.01";
 }
@@ -152,16 +152,18 @@ void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_
 
 #ifdef _WIN32
 	WCHAR DllPath[MAX_PATH] = {0};
-	GetModuleFileNameW((HINSTANCE)&__ImageBase, DllPath, _countof(DllPath));
+	GetModuleFileNameW((HINSTANCE)&__ImageBase, DllPath, (DWORD) MAX_PATH);
 
 	WCHAR *tmp = wcsrchr(DllPath, L'\\');
-	WCHAR ConfigPath[MAX_PATH] = {0};
+	WCHAR wConfigPath[MAX_PATH] = {0};
 	
 	size_t path_len = tmp - DllPath;
 
-	wcsncpy(ConfigPath, DllPath, path_len);
-	wcscat(ConfigPath, L"\\config.ini"); 
+	wcsncpy(wConfigPath, DllPath, path_len);
+	wcscat(wConfigPath, L"\\config.ini"); 
 
+	char ConfigPath[MAX_PATH] = {0};
+	wcstombs(ConfigPath,wConfigPath,sizeof(ConfigPath));
 #else
 
 	Dl_info PathToSharedObject;
@@ -317,8 +319,11 @@ void *KeyboardControlModule::writePC(unsigned int *buffer_length) {
 	return NULL;
 }
 
-int KeyboardControlModule::startProgram(int uniq_index, void *buffer, unsigned int buffer_length) {
+int KeyboardControlModule::startProgram(int uniq_index) {
 	return 0;
+}
+
+void KeyboardControlModule::readPC(void *buffer, unsigned int buffer_length) {
 }
 
 int KeyboardControlModule::endProgram(int uniq_index) {
