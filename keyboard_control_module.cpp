@@ -48,7 +48,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	DWORD fdwSaveOldMode;
 #else
-	int fd;
+	int fd = open(InputDevice.c_str(), O_RDONLY);
 #endif
 	
 	try {
@@ -82,14 +82,13 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 
 					if (key_code != VK_ESCAPE) {
 #else
-		struct input_event ev;
-		ssize_t n;
-
-		fd = open(InputDevice.c_str(), O_RDONLY);
 		if (fd == -1) {
 			(*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
 			throw std::exception();
 		}
+
+		struct input_event ev;
+		ssize_t n;
 
 		while (1) {
 			n = read(fd, &ev, sizeof ev);
