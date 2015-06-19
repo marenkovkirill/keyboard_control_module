@@ -78,7 +78,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 				if (irInBuf[i].EventType == KEY_EVENT) {
 					WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
 					(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
-					bool is_key_pressed = (bool) irInBuf[i].Event.KeyEvent.bKeyDown;
+					bool is_key_pressed = (bool)irInBuf[i].Event.KeyEvent.bKeyDown;
 
 					if (key_code != VK_ESCAPE) {
 #else
@@ -93,18 +93,16 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 
 		while (1) {
 			n = read(fd, &ev, sizeof ev);
-			if (n == (ssize_t)-1) {
+			if (n == ((ssize_t)-1)) {
 				if (errno == EINTR) {
 					continue;
-				}
-				else{
+				} else {
 					throw std::exception();
 				}
-			} else
-				if (n != sizeof ev) {
-					errno = EIO;
-					throw std::exception();
-				}
+			} else if (n != sizeof(ev)) {
+				errno = EIO;
+				throw std::exception();
+			}
 			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
 				uint16_t key_code = ev.code;
 				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
@@ -115,33 +113,32 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 #endif
 					if (axis_keys.find(key_code) != axis_keys.end()) {
 
-						AxisKey *ak = axis_keys[key_code]; 
+						AxisKey *ak = axis_keys[key_code];
 						system_value axis_index = ak->axis_index;
-						
+
 						variable_value val = is_key_pressed ? ak->pressed_value : ak->unpressed_value;
 
 						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
 						(*sendAxisState)(axis_index, val);
-						}
 					}
+				}
 				else {
 					if (is_key_pressed){
 						throw std::exception(); //exit
 					}
 				}
-				}
 			}
-		}
-	}
-catch(...) {
-
-}
 #ifdef _WIN32
-SetConsoleMode(hStdin, fdwSaveOldMode);
-#else
-close(fd);
+			}
 #endif
+		}
+	} catch(...) {}
 
+#ifdef _WIN32
+	SetConsoleMode(hStdin, fdwSaveOldMode);
+#else
+	close(fd);
+#endif
 }
 
 const char *KeyboardControlModule::getUID() {
