@@ -88,9 +88,9 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 		}
 
 		struct input_event ev;
-		ssize_t n;
 
 		while (1) {
+      ssize_t n;
 			n = read(fd, &ev, sizeof ev);
 			if (n == ((ssize_t)-1)) {
 				if (errno == EINTR) {
@@ -203,8 +203,8 @@ void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_
 	CSimpleIniA::TNamesDepend axis_names_ini;
 	ini.GetAllKeys("mapped_axis", axis_names_ini);
 	
-	system_value axis_id = 1;
 	try {
+    system_value axis_id = 1;
 		for (
 			CSimpleIniA::TNamesDepend::const_iterator i = axis_names_ini.begin(); 
 			i != axis_names_ini.end(); 
