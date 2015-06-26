@@ -15,11 +15,17 @@ class KeyboardControlModule : public ControlModule {
 	bool is_error_init;
 	
 	std::map<std::string, system_value> axis_names;
+#ifdef _WIN32
 	std::map<WORD, AxisKey*> axis_keys;
+#else
+	std::map<uint32_t, AxisKey*> axis_keys;
+	std::string InputDevice;
+#endif
+	
 	std::map<system_value, AxisData*> axis;
 
 	public:
-		KeyboardControlModule();
+		KeyboardControlModule(){};
 
 		//init
 		const char *getUID();
@@ -34,8 +40,11 @@ class KeyboardControlModule : public ControlModule {
 		void execute(sendAxisState_t sendAxisState);
 		void final() {};
 
-		//intepreter - program
-		int startProgram(int uniq_index, void *buffer, unsigned int buffer_length);
+		//intepreter - program & lib
+        void readPC(void *buffer, unsigned int buffer_length);
+        
+        //intepreter - program
+        int startProgram(int uniq_index);
 		int endProgram(int uniq_index);
 
 		//destructor

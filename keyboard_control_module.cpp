@@ -1,18 +1,32 @@
+#ifdef _WIN32
+	#define _CRT_SECURE_NO_WARNINGS
+#endif	
+
+#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <windows.h>
-#include <winuser.h>
+#include <string>
 #include <map>
 
-#include "../module_headers/module.h"
-#include "../module_headers/control_module.h"
-#include "../rcml_compiler/globals.h"
-
-#include "keyboard_control_module.h"
+#ifdef _WIN32
+	#include <windows.h>
+#else
+	#include <unistd.h>
+	#include <fcntl.h>
+	#include <dlfcn.h>
+	#include <errno.h>
+	#include <linux/input.h>
+#endif	
 
 #include "SimpleIni.h"
 
-EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+#include "module.h"
+#include "control_module.h"
+
+#include "keyboard_control_module.h"
+
+#ifdef _WIN32
+	EXTERN_C IMAGE_DOS_HEADER __ImageBase;
+#endif
 
 inline variable_value getIniValue(CSimpleIniA *ini, const char *section_name, const char *key_name) {
 	const char *tmp = ini->GetValue(section_name, key_name, NULL);
@@ -30,79 +44,167 @@ inline const char *copyStrValue(const char *source) {
 }
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
+#ifdef _WIN32
 	HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
-	if (hStdin == INVALID_HANDLE_VALUE) {
-		goto exit; //error
-	}
-
 	DWORD fdwSaveOldMode;
-	if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) {
-		goto exit; //error
-	}
-	DWORD fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
-	if (!SetConsoleMode(hStdin, fdwMode)) {
-		goto exit; //error
-	}
-
-	INPUT_RECORD irInBuf[128];
-	DWORD cNumRead;
-	DWORD i;
-	while (1) {
-		if (!ReadConsoleInput(hStdin, irInBuf, 128, &cNumRead))  {
-			goto exit; //error
+#else
+	int fd = open(InputDevice.c_str(), O_RDONLY);
+#endif
+	
+	try {
+#ifdef _WIN32
+		if (hStdin == INVALID_HANDLE_VALUE) {
+			throw std::exception();
 		}
 
-		for (i = 0; i < cNumRead; ++i) {
-			if (irInBuf[i].EventType == KEY_EVENT) { 
-				WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
+		if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) {
+			throw std::exception(); //error
+		}
+
+		DWORD fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+		if (!SetConsoleMode(hStdin, fdwMode)) {
+			throw std::exception(); //error
+		}
+
+		INPUT_RECORD irInBuf[128];
+		DWORD cNumRead;
+		DWORD i;
+		while (1) {
+			if (!ReadConsoleInput(hStdin, irInBuf, 128, &cNumRead))  {
+				throw std::exception(); //error
+			}
+
+			for (i = 0; i < cNumRead; ++i) {
+				if (irInBuf[i].EventType == KEY_EVENT) {
+					WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
+					(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
+					bool is_key_pressed = (bool)irInBuf[i].Event.KeyEvent.bKeyDown;
+
+					if (key_code != VK_ESCAPE) {
+#else
+		if (fd == -1) {
+			(*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
+			throw std::exception();
+		}
+
+		struct input_event ev;
+
+		while (1) {
+      ssize_t n;
+			n = read(fd, &ev, sizeof ev);
+			if (n == ((ssize_t)-1)) {
+				if (errno == EINTR) {
+					continue;
+				} else {
+					throw std::exception();
+				}
+			} else if (n != sizeof(ev)) {
+				errno = EIO;
+				throw std::exception();
+			}
+			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
+				uint16_t key_code = ev.code;
 				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
-				
-				if (key_code != VK_ESCAPE) {
+
+				bool is_key_pressed = (bool) ev.value;
+
+				if (key_code != KEY_ESC) {
+#endif
 					if (axis_keys.find(key_code) != axis_keys.end()) {
+
 						AxisKey *ak = axis_keys[key_code];
 						system_value axis_index = ak->axis_index;
-						variable_value val = irInBuf[i].Event.KeyEvent.bKeyDown ? ak->pressed_value : ak->unpressed_value;
-						
+
+						variable_value val = is_key_pressed ? ak->pressed_value : ak->unpressed_value;
+
 						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
 						(*sendAxisState)(axis_index, val);
 					}
-				} else {
-					goto exit; //exit
+				}
+				else {
+					if (is_key_pressed){
+						throw std::exception(); //exit
+					}
 				}
 			}
+#ifdef _WIN32
+			}
+#endif
 		}
-	}
+	} catch(...) {}
 
-	exit:
+#ifdef _WIN32
 	SetConsoleMode(hStdin, fdwSaveOldMode);
+#else
+	close(fd);
+#endif
 }
 
-KeyboardControlModule::KeyboardControlModule() {
+const char *KeyboardControlModule::getUID() {
+	return "Keyboard control module 1.01";
+}
+
+void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
+	this->colorPrintf = colorPrintf_p;
+
+#ifdef _WIN32
 	WCHAR DllPath[MAX_PATH] = {0};
-	GetModuleFileNameW((HINSTANCE)&__ImageBase, DllPath, _countof(DllPath));
+	GetModuleFileNameW((HINSTANCE)&__ImageBase, DllPath, (DWORD) MAX_PATH);
 
 	WCHAR *tmp = wcsrchr(DllPath, L'\\');
-	WCHAR ConfigPath[MAX_PATH] = {0};
+	WCHAR wConfigPath[MAX_PATH] = {0};
 	
 	size_t path_len = tmp - DllPath;
 
-	wcsncpy(ConfigPath, DllPath, path_len);
-	wcscat(ConfigPath, L"\\config.ini");
+	wcsncpy(wConfigPath, DllPath, path_len);
+	wcscat(wConfigPath, L"\\config.ini"); 
 
+	char ConfigPath[MAX_PATH] = {0};
+	wcstombs(ConfigPath,wConfigPath,sizeof(ConfigPath));
+#else
+
+	Dl_info PathToSharedObject;
+	void * pointer = reinterpret_cast<void*> (getControlModuleObject) ;
+	dladdr(pointer,&PathToSharedObject);
+	std::string dltemp(PathToSharedObject.dli_fname);
+
+	int dlfound = dltemp.find_last_of("/");
+
+	dltemp = dltemp.substr(0,dlfound);
+	dltemp += "/config.ini";
+
+	const char* ConfigPath = dltemp.c_str();
+
+#endif
+	
 	CSimpleIniA ini;
     ini.SetMultiKey(true);
 
 	if (ini.LoadFile(ConfigPath) < 0) {
-		printf("Can't load '%s' file!\n", ConfigPath);
+		(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't load '%s' file!\n", ConfigPath);
 		is_error_init = true;
 		return;
 	}
 
+	#ifndef _WIN32
+		const char* tempInput;
+		tempInput = ini.GetValue("options","input_path",NULL);
+		if (tempInput == NULL) {
+			(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't recieve path to input device");
+			is_error_init = true;
+			return;
+		}
+		InputDevice.assign(tempInput);
+
+
+	#endif
+
+
 	CSimpleIniA::TNamesDepend axis_names_ini;
 	ini.GetAllKeys("mapped_axis", axis_names_ini);
 	
-	system_value axis_id = 1;
 	try {
+    system_value axis_id = 1;
 		for (
 			CSimpleIniA::TNamesDepend::const_iterator i = axis_names_ini.begin(); 
 			i != axis_names_ini.end(); 
@@ -125,7 +227,12 @@ KeyboardControlModule::KeyboardControlModule() {
 				CSimpleIniA::TNamesDepend::const_iterator iniValue = values.begin(); 
 				iniValue != values.end(); 
 				++iniValue) { 
+
+				#ifdef _WIN32
 					WORD key_code = strtol(iniValue->pItem, NULL, 0);
+				#else
+					uint32_t key_code = strtol(iniValue->pItem, NULL, 0);
+				#endif
 
 					std::string key_name = section_name;
 					key_name.append("_");
@@ -160,14 +267,6 @@ KeyboardControlModule::KeyboardControlModule() {
 	}
 	
 	is_error_init = false;
-}
-
-const char *KeyboardControlModule::getUID() {
-	return "Keyboard control module 1.01";
-}
-
-void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
-	this->colorPrintf = colorPrintf_p;
 }
 
 int KeyboardControlModule::init() {
@@ -217,8 +316,11 @@ void *KeyboardControlModule::writePC(unsigned int *buffer_length) {
 	return NULL;
 }
 
-int KeyboardControlModule::startProgram(int uniq_index, void *buffer, unsigned int buffer_length) {
+int KeyboardControlModule::startProgram(int uniq_index) {
 	return 0;
+}
+
+void KeyboardControlModule::readPC(void *buffer, unsigned int buffer_length) {
 }
 
 int KeyboardControlModule::endProgram(int uniq_index) {
@@ -226,6 +328,6 @@ int KeyboardControlModule::endProgram(int uniq_index) {
 }
 
 
-__declspec(dllexport) ControlModule* getControlModuleObject() {
+PREFIX_FUNC_DLL  ControlModule* getControlModuleObject() {
 	return new KeyboardControlModule();
 }
