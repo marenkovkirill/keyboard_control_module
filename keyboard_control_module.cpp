@@ -2,8 +2,7 @@
 	#define _CRT_SECURE_NO_WARNINGS
 #endif	
 
-#include <stdlib.h>
-#include <stdio.h>
+#include <stdarg.h>
 #include <string>
 #include <map>
 
@@ -77,13 +76,13 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 			for (i = 0; i < cNumRead; ++i) {
 				if (irInBuf[i].EventType == KEY_EVENT) {
 					WORD key_code = irInBuf[i].Event.KeyEvent.wVirtualKeyCode;
-					(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
+					colorPrintf(ConsoleColor(), "Key event: %d", key_code);
 					bool is_key_pressed = (bool)irInBuf[i].Event.KeyEvent.bKeyDown;
 
 					if (key_code != VK_ESCAPE) {
 #else
 		if (fd == -1) {
-			(*colorPrintf)(this, ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
+			colorPrintf(ConsoleColor(ConsoleColor::red),"Input Device troubles. Cannot open %s: %s.\n", InputDevice.c_str(), strerror(errno));
 			throw std::exception();
 		}
 
@@ -104,7 +103,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 			}
 			if (ev.type == EV_KEY && ev.value >= 0 && ev.value <= 2) { 
 				uint16_t key_code = ev.code;
-				(*colorPrintf)(this, ConsoleColor(), "Key event: %d", key_code);
+				colorPrintf(ConsoleColor(), "Key event: %d", key_code);
 
 				bool is_key_pressed = (bool) ev.value;
 
@@ -117,7 +116,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 
 						variable_value val = is_key_pressed ? ak->pressed_value : ak->unpressed_value;
 
-						(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
+						colorPrintf(ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
 						(*sendAxisState)(axis_index, val);
 					}
 				}
@@ -144,8 +143,8 @@ const char *KeyboardControlModule::getUID() {
 	return "Keyboard control module 1.01";
 }
 
-void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_t *colorPrintfVA_p) {
-	this->colorPrintf = colorPrintf_p;
+void KeyboardControlModule::prepare(colorPrintfModule_t *colorPrintf_p, colorPrintfModuleVA_t *colorPrintfVA_p) {
+	this->colorPrintf_p = colorPrintfVA_p;
 
 #ifdef _WIN32
 	WCHAR DllPath[MAX_PATH] = {0};
@@ -174,14 +173,13 @@ void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_
 	dltemp += "/config.ini";
 
 	const char* ConfigPath = dltemp.c_str();
-
 #endif
 	
 	CSimpleIniA ini;
     ini.SetMultiKey(true);
 
 	if (ini.LoadFile(ConfigPath) < 0) {
-		(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't load '%s' file!\n", ConfigPath);
+		colorPrintf(ConsoleColor(ConsoleColor::yellow), "Can't load '%s' file!\n", ConfigPath);
 		is_error_init = true;
 		return;
 	}
@@ -190,7 +188,7 @@ void KeyboardControlModule::prepare(colorPrintf_t *colorPrintf_p, colorPrintfVA_
 		const char* tempInput;
 		tempInput = ini.GetValue("options","input_path",NULL);
 		if (tempInput == NULL) {
-			(*colorPrintf)(this, ConsoleColor(ConsoleColor::yellow), "Can't recieve path to input device");
+			colorPrintf(ConsoleColor(ConsoleColor::yellow), "Can't recieve path to input device");
 			is_error_init = true;
 			return;
 		}
@@ -325,6 +323,13 @@ void KeyboardControlModule::readPC(void *buffer, unsigned int buffer_length) {
 
 int KeyboardControlModule::endProgram(int uniq_index) {
 	return 0;
+}
+
+void KeyboardControlModule::colorPrintf(ConsoleColor colors, const char *mask, ...) {
+	va_list args;
+	va_start(args, mask);
+	(*colorPrintf_p)(this, colors, mask, args);
+	va_end(args);
 }
 
 
