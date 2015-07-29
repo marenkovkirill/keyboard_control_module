@@ -117,7 +117,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 						variable_value val = is_key_pressed ? ak->pressed_value : ak->unpressed_value;
 
 						colorPrintf(ConsoleColor(ConsoleColor::yellow), "axis %d val %f \n", axis_index, val);
-						(*sendAxisState)(axis_index, val);
+						(*sendAxisState)(this, axis_index, val);
 					}
 				}
 				else {
