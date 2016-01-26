@@ -24,11 +24,19 @@ class KeyboardControlModule : public ControlModule {
 
   std::map<system_value, AxisData *> axis;
 
+#ifndef CONTROL_MODULE_H_000
+  ModuleInfo *mi;
+#endif
+
  public:
-  KeyboardControlModule(){};
+  KeyboardControlModule();
 
   // init
+#ifdef CONTROL_MODULE_H_000
   const char *getUID();
+#else
+  const struct ModuleInfo &getModuleInfo();
+#endif
   void prepare(colorPrintfModule_t *colorPrintf_p,
                colorPrintfModuleVA_t *colorPrintfVA_p);
 
