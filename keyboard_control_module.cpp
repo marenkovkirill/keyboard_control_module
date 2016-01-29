@@ -47,13 +47,11 @@ inline const char *copyStrValue(const char *source) {
 }
 
 KeyboardControlModule::KeyboardControlModule(){
-#ifndef CONTROL_MODULE_H_000
   mi = new ModuleInfo;
   mi->uid = IID;
   mi->mode = ModuleInfo::Modes::PROD;
   mi->version = BUILD_NUMBER;
   mi->digest = NULL;
-#endif
 };
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
@@ -156,11 +154,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 #endif
 }
 
-#ifdef CONTROL_MODULE_H_000
-const char *KeyboardControlModule::getUID() { return IID; }
-#else
 const struct ModuleInfo &KeyboardControlModule::getModuleInfo() { return *mi; }
-#endif
 
 void KeyboardControlModule::prepare(colorPrintfModule_t *colorPrintf_p,
                                     colorPrintfModuleVA_t *colorPrintfVA_p) {
@@ -296,9 +290,7 @@ AxisData **KeyboardControlModule::getAxis(unsigned int *count_axis) {
 }
 
 void KeyboardControlModule::destroy() {
-#ifndef CONTROL_MODULE_H_000
   delete mi;
-#endif
   for (unsigned int j = 0; j < COUNT_AXIS; ++j) {
     delete robot_axis[j];
   }
@@ -337,11 +329,9 @@ void KeyboardControlModule::colorPrintf(ConsoleColor colors, const char *mask,
   va_end(args);
 }
 
-#ifndef CONTROL_MODULE_H_000
 PREFIX_FUNC_DLL unsigned short getControlModuleApiVersion() {
   return CONTROL_MODULE_API_VERSION;
 };
-#endif
 
 PREFIX_FUNC_DLL ControlModule *getControlModuleObject() {
   return new KeyboardControlModule();
