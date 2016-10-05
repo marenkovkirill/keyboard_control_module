@@ -52,7 +52,7 @@ KeyboardControlModule::KeyboardControlModule(){
   mi->mode = ModuleInfo::Modes::PROD;
   mi->version = BUILD_NUMBER;
   mi->digest = NULL;
-};
+}
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 #ifdef _WIN32
@@ -331,7 +331,7 @@ void KeyboardControlModule::colorPrintf(ConsoleColor colors, const char *mask,
 
 PREFIX_FUNC_DLL unsigned short getControlModuleApiVersion() {
   return MODULE_API_VERSION;
-};
+}
 
 PREFIX_FUNC_DLL ControlModule *getControlModuleObject() {
   return new KeyboardControlModule();
