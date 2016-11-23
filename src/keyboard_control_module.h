@@ -8,11 +8,12 @@ struct AxisKey {
 };
 
 class KeyboardControlModule : public ControlModule {
-  AxisData **robot_axis;
-  unsigned int COUNT_AXIS;
-  colorPrintfModuleVA_t *colorPrintf_p;
+  ModuleInfo mi{};
+  unsigned int COUNT_AXIS{0};
+  AxisData **robot_axis = nullptr;
+  colorPrintfModuleVA_t *colorPrintf_p = nullptr;
 
-  bool is_error_init;
+  bool is_error_init = false;
 
   std::map<std::string, system_value> axis_names;
 #ifdef _WIN32
@@ -23,7 +24,6 @@ class KeyboardControlModule : public ControlModule {
 #endif
 
   std::map<system_value, AxisData *> axis;
-  ModuleInfo *mi;
 
  public:
   KeyboardControlModule();
@@ -51,7 +51,7 @@ class KeyboardControlModule : public ControlModule {
 
   // destructor
   void destroy();
-  ~KeyboardControlModule() {}
+  ~KeyboardControlModule();
 
   void colorPrintf(ConsoleColor colors, const char *mask, ...);
 };
