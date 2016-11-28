@@ -30,7 +30,8 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define IID "RCT.Keyboard_control_module_v100"
 
 inline variable_value getIniValue(CSimpleIniA *ini, const char *section_name,
-                                  const char *key_name) {
+                                  const char *key_name)
+{
   const char *tmp = ini->GetValue(section_name, key_name, NULL);
   if (!tmp) {
     printf("Not specified value for \"%s\" in section \"%s\"!\n", key_name,
@@ -46,13 +47,12 @@ inline const char *copyStrValue(const char *source) {
   return dest;
 }
 
-KeyboardControlModule::KeyboardControlModule(){
-  mi = new ModuleInfo;
-  mi->uid = IID;
-  mi->mode = ModuleInfo::Modes::PROD;
-  mi->version = BUILD_NUMBER;
-  mi->digest = NULL;
-};
+KeyboardControlModule::KeyboardControlModule() {
+  mi.uid = IID;
+  mi.mode = ModuleInfo::Modes::PROD;
+  mi.version = BUILD_NUMBER;
+  mi.digest = nullptr;
+}
 
 void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 #ifdef _WIN32
@@ -154,7 +154,7 @@ void KeyboardControlModule::execute(sendAxisState_t sendAxisState) {
 #endif
 }
 
-const struct ModuleInfo &KeyboardControlModule::getModuleInfo() { return *mi; }
+const struct ModuleInfo &KeyboardControlModule::getModuleInfo() { return mi; }
 
 void KeyboardControlModule::prepare(colorPrintfModule_t *colorPrintf_p,
                                     colorPrintfModuleVA_t *colorPrintfVA_p) {
@@ -281,16 +281,19 @@ int KeyboardControlModule::init() { return is_error_init ? 1 : 0; }
 
 AxisData **KeyboardControlModule::getAxis(unsigned int *count_axis) {
   if (is_error_init) {
-    (*count_axis) = 0;
-    return NULL;
+    if (count_axis) {
+      *count_axis = 0;
+    }
+    return nullptr;
   }
 
-  (*count_axis) = COUNT_AXIS;
+  if (count_axis) {
+    *count_axis = COUNT_AXIS;
+  }
   return robot_axis;
 }
 
-void KeyboardControlModule::destroy() {
-  delete mi;
+KeyboardControlModule::~KeyboardControlModule() {
   for (unsigned int j = 0; j < COUNT_AXIS; ++j) {
     delete robot_axis[j];
   }
@@ -306,7 +309,9 @@ void KeyboardControlModule::destroy() {
     delete i->second;
   }
   axis.clear();
+}
 
+void KeyboardControlModule::destroy() {
   delete this;
 }
 
@@ -331,7 +336,7 @@ void KeyboardControlModule::colorPrintf(ConsoleColor colors, const char *mask,
 
 PREFIX_FUNC_DLL unsigned short getControlModuleApiVersion() {
   return MODULE_API_VERSION;
-};
+}
 
 PREFIX_FUNC_DLL ControlModule *getControlModuleObject() {
   return new KeyboardControlModule();
